@@ -1,0 +1,143 @@
+#!/bin/bash
+ACCOUNTS_DIR="$HOME/.local/share/opencode/copilot-accounts"
+CURRENT_FILE="$ACCOUNTS_DIR/current"
+AUTH_FILE="$HOME/.local/share/opencode/auth.json"
+
+usage() {
+  echo "Usage: copilot-auth <command>"
+  echo ""
+  echo "Commands:"
+  echo "  use <account>        Switch to an account"
+  echo "  list                 List available accounts"
+  echo "  current              Show active account"
+  echo "  add <account>        Save current auth.json copilot entry as a new account"
+  echo "  token <account>      Show stored token for an account"
+}
+
+list_accounts() {
+  echo "Available accounts:"
+  current=$(cat "$CURRENT_FILE" 2>/dev/null)
+  for f in "$ACCOUNTS_DIR"/*.json; do
+    name=$(basename "$f" .json)
+    if [ "$name" = "$current" ]; then
+      echo "  * $name (active)"
+    else
+      echo "    $name"
+    fi
+  done
+}
+
+show_current() {
+  if [ -f "$CURRENT_FILE" ]; then
+    current=$(cat "$CURRENT_FILE")
+    echo "Current account: $current"
+    account_file="$ACCOUNTS_DIR/${current}.json"
+    if [ -f "$account_file" ]; then
+      token=$(python3 -c "import json; d=json.load(open('$account_file')); print(d.get('access','?')[:20] + '...')" 2>/dev/null)
+      echo "Token: $token"
+    fi
+  else
+    echo "No active account set."
+  fi
+}
+
+use_account() {
+  local account="$1"
+  local account_file="$ACCOUNTS_DIR/${account}.json"
+
+  if [ -z "$account" ]; then
+    echo "Error: specify an account name."
+    list_accounts
+    return 1
+  fi
+
+  if [ ! -f "$account_file" ]; then
+    echo "Error: account '$account' not found."
+    list_accounts
+    return 1
+  fi
+
+  # Merge the copilot entry into auth.json, preserving all other providers
+  python3 - <<EOF
+import json
+
+with open('$AUTH_FILE', 'r') as f:
+    auth = json.load(f)
+
+with open('$account_file', 'r') as f:
+    copilot = json.load(f)
+
+auth['github-copilot'] = copilot
+
+with open('$AUTH_FILE', 'w') as f:
+    json.dump(auth, f, indent=2)
+    f.write('\n')
+
+print("Updated auth.json with github-copilot from $account")
+EOF
+
+  echo "$account" > "$CURRENT_FILE"
+  echo "Switched to: $account"
+}
+
+add_account() {
+  local account="$1"
+
+  if [ -z "$account" ]; then
+    echo "Error: specify an account name."
+    return 1
+  fi
+
+  local account_file="$ACCOUNTS_DIR/${account}.json"
+
+  python3 - <<EOF
+import json
+
+with open('$AUTH_FILE', 'r') as f:
+    auth = json.load(f)
+
+copilot = auth.get('github-copilot', {})
+if not copilot:
+    print("Error: no github-copilot entry found in auth.json")
+    exit(1)
+
+with open('$account_file', 'w') as f:
+    json.dump(copilot, f, indent=2)
+    f.write('\n')
+
+print("Saved current copilot token as: $account")
+EOF
+}
+
+show_token() {
+  local account="$1"
+  local account_file="$ACCOUNTS_DIR/${account}.json"
+
+  if [ ! -f "$account_file" ]; then
+    echo "Error: account '$account' not found."
+    return 1
+  fi
+
+  python3 -c "import json; d=json.load(open('$account_file')); print(json.dumps(d, indent=2))"
+}
+
+case "${1:-}" in
+  use)
+    use_account "$2"
+    ;;
+  list|ls)
+    list_accounts
+    ;;
+  current|whoami)
+    show_current
+    ;;
+  add)
+    add_account "$2"
+    ;;
+  token)
+    show_token "$2"
+    ;;
+  *)
+    usage
+    ;;
+esac

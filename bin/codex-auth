@@ -1,0 +1,80 @@
+#!/bin/bash
+CODEX_DIR="$HOME/.codex"
+ACCOUNTS_DIR="$CODEX_DIR/accounts"
+AUTH_FILE="$CODEX_DIR/auth.json"
+CURRENT_FILE="$CODEX_DIR/current"
+
+usage() {
+  echo "Usage: codex-auth <command>"
+  echo ""
+  echo "Commands:"
+  echo "  use <account>   Switch to an account"
+  echo "  list            List available accounts"
+  echo "  current         Show active account"
+  echo "  login           Re-symlink current account (refresh)"
+}
+
+list_accounts() {
+  echo "Available accounts:"
+  current=$(cat "$CURRENT_FILE" 2>/dev/null)
+  for f in "$ACCOUNTS_DIR"/*.json; do
+    name=$(basename "$f" .json)
+    if [ "$name" = "$current" ]; then
+      echo "  * $name (active)"
+    else
+      echo "    $name"
+    fi
+  done
+}
+
+show_current() {
+  if [ -f "$CURRENT_FILE" ]; then
+    echo "Current account: $(cat "$CURRENT_FILE")"
+  else
+    echo "No active account set."
+  fi
+}
+
+use_account() {
+  local account="$1"
+  local account_file="$ACCOUNTS_DIR/${account}.json"
+
+  if [ -z "$account" ]; then
+    echo "Error: specify an account name."
+    list_accounts
+    return 1
+  fi
+
+  if [ ! -f "$account_file" ]; then
+    echo "Error: account '$account' not found."
+    list_accounts
+    return 1
+  fi
+
+  ln -sf "$account_file" "$AUTH_FILE"
+  echo "$account" > "$CURRENT_FILE"
+  echo "Switched to: $account"
+}
+
+case "${1:-}" in
+  use)
+    use_account "$2"
+    ;;
+  list|ls)
+    list_accounts
+    ;;
+  current|whoami)
+    show_current
+    ;;
+  login|refresh)
+    current=$(cat "$CURRENT_FILE" 2>/dev/null)
+    if [ -n "$current" ]; then
+      use_account "$current"
+    else
+      echo "No current account. Use: codex-auth use <account>"
+    fi
+    ;;
+  *)
+    usage
+    ;;
+esac
