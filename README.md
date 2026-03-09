@@ -20,23 +20,28 @@ Manages multiple accounts for the [Codex CLI](https://github.com/openai/codex). 
 codex-auth list              # list all accounts
 codex-auth current           # show active account
 codex-auth use <account>     # switch to an account
+codex-auth save <account>    # save current login as a named account
 codex-auth login             # re-symlink current account
 ```
 
-**Setup:** After logging in with `codex` for each account, save them:
+**Setup:** Log in with `codex auth login` for each account, then save them:
 
 ```bash
-# Log in with account 1, then:
-cp ~/.codex/auth.json ~/.codex/accounts/personal.json
+# Log in with account 1:
+codex auth login
 
-# Log in with account 2, then:
-cp ~/.codex/auth.json ~/.codex/accounts/work.json
+# Save it as a named account:
+codex-auth save personal
 
-# Create current tracker:
-echo "personal" > ~/.codex/current
+# Log in with account 2:
+codex auth login
+
+# Save it:
+codex-auth save sivhour
 
 # Switch accounts:
-codex-auth use work
+codex-auth use personal
+codex-auth use sivhour
 ```
 
 ---

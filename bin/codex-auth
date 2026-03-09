@@ -8,10 +8,11 @@ usage() {
   echo "Usage: codex-auth <command>"
   echo ""
   echo "Commands:"
-  echo "  use <account>   Switch to an account"
-  echo "  list            List available accounts"
-  echo "  current         Show active account"
-  echo "  login           Re-symlink current account (refresh)"
+  echo "  use <account>    Switch to an account"
+  echo "  save <account>   Save current auth.json as a named account"
+  echo "  list             List available accounts"
+  echo "  current          Show active account"
+  echo "  login            Re-symlink current account (refresh)"
 }
 
 list_accounts() {
@@ -33,6 +34,25 @@ show_current() {
   else
     echo "No active account set."
   fi
+}
+
+save_account() {
+  local account="$1"
+
+  if [ -z "$account" ]; then
+    echo "Error: specify an account name."
+    return 1
+  fi
+
+  if [ ! -f "$AUTH_FILE" ]; then
+    echo "Error: no auth.json found at $AUTH_FILE. Log in with 'codex' first."
+    return 1
+  fi
+
+  mkdir -p "$ACCOUNTS_DIR"
+  cp "$AUTH_FILE" "$ACCOUNTS_DIR/${account}.json"
+  echo "$account" > "$CURRENT_FILE"
+  echo "Saved current login as: $account"
 }
 
 use_account() {
@@ -59,6 +79,9 @@ use_account() {
 case "${1:-}" in
   use)
     use_account "$2"
+    ;;
+  save|add)
+    save_account "$2"
     ;;
   list|ls)
     list_accounts
